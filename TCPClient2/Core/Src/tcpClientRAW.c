@@ -87,9 +87,6 @@ struct tcp_client_struct
   struct pbuf *p;         /* pointer on the received/to be transmitted pbuf */
 };
 
-
-void JSON_Make(void);
-void JSON_Parse(void);
 /* This callback will be called, when the client is connected to the server */
 static err_t tcp_client_connected(void *arg, struct tcp_pcb *tpcb, err_t err);
 
@@ -115,7 +112,10 @@ int counter = 0;
 uint8_t data[100];
 
 extern TIM_HandleTypeDef htim1;
+extern UART_HandleTypeDef huart3; // Declared here to be visible in this file
 
+// Define a maximum size for temporary formatted strings for UART transmission
+#define MAX_UART_MSG_LEN 128 // Defined here to be visible in this file
 /* create a struct to store data */
 struct tcp_client_struct *esTx = 0;
 
@@ -123,15 +123,15 @@ struct tcp_pcb *pcbTx = 0;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	char buf[100];
+	/*char buf[300];
 
 	//Prepare the first message to send to the server
-	int len = sprintf (buf, "Sending TCPclient Message %d\n", counter);
+	//int len = sprintf (buf, "Sending TCPclient Message %d\n", counter);
+	//	JSON_Parse();
 	JSON_Make();
-	JSON_Parse();
 
 	// Use the generated JSON string from gu8DataBuffer instead of undefined pOut
-	len = sprintf (buf, "%s", (char*)gu8DataBuffer);
+	int len = sprintf (buf, "%s", (char*)gu8DataBuffer);
 
 	if (counter !=0)
 	{
@@ -145,12 +145,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		tcp_client_send(pcbTx, esTx);
 
 		pbuf_free(esTx->p);
-	}
+	}*/
 }
-
-
-
-
 
 
 /* IMPLEMENTATION FOR TCP CLIENT
@@ -455,6 +451,7 @@ static void tcp_client_connection_close(struct tcp_pcb *tpcb, struct tcp_client_
 
 static void tcp_client_handle (struct tcp_pcb *tpcb, struct tcp_client_struct *es)
 {
+	char buf[300];
 	/* get the Remote IP */
 	ip4_addr_t inIP = tpcb->remote_ip;
 	uint16_t inPort = tpcb->remote_port;
@@ -474,7 +471,26 @@ static void tcp_client_handle (struct tcp_pcb *tpcb, struct tcp_client_struct *e
 	pcbTx = tpcb;
 
 	counter++;
+	JSON_Parse();
 
+	JSON_Make();
+
+	// Use the generated JSON string from gu8DataBuffer instead of undefined pOut
+	int len = sprintf (buf, "%s", (char*)gu8DataBuffer);
+
+	if (counter !=0)
+	{
+		// allocate pbuf
+		esTx->p = pbuf_alloc(PBUF_TRANSPORT, len , PBUF_POOL);
+
+
+		// copy data to pbuf
+		pbuf_take(esTx->p, (char*)buf, len);
+
+		tcp_client_send(pcbTx, esTx);
+
+		pbuf_free(esTx->p);
+	}
 }
 
 void JSON_Parse(void) {
@@ -486,16 +502,20 @@ void JSON_Parse(void) {
     // Or if testing with strTestData: cJSON *root = cJSON_Parse(strTestData);
 
     if (root == NULL) {
-        snprintf((char *)"JSON Parse Error: Invalid JSON\n");
+        HAL_UART_Transmit(&huart3, (uint8_t*)"JSON Parse Error: Invalid JSON\n", strlen("JSON Parse Error: Invalid JSON\n"), 10);
         return;
     }
 
     cJSON *cmd_item = cJSON_GetObjectItem(root, "cmd");
 
     if (cJSON_IsString(cmd_item) && (cmd_item->valuestring != NULL)) {
-        snprintf((char *)"Parsed Command: %s\n", cmd_item->valuestring);
+        char uart_msg[MAX_UART_MSG_LEN];
+        int len = snprintf(uart_msg, sizeof(uart_msg), "Parsed Command: %s\n", cmd_item->valuestring);
+        if (len > 0) {
+            HAL_UART_Transmit(&huart3, (uint8_t*)uart_msg, (uint16_t)len, 10);
+        }     //   printf("Parsed Command: %s\n", cmd_item->valuestring);
     } else {
-        snprintf((char *)"JSON Parse Error: 'cmd' not found or not a string\n");
+        HAL_UART_Transmit(&huart3, (uint8_t*)"Hello command received - enabling transmission\n", strlen("Hello command received - enabling transmission\n"), 10);
     }
 
     cJSON_Delete(root); // Free the cJSON object
@@ -511,7 +531,7 @@ void JSON_Make(void) {
     if (root != NULL) {
         /* Add items to the root object */
         cJSON_AddItemToObject(root, "cmd", cJSON_CreateString("hello"));
-        cJSON_AddItemToObject(root, "id", cJSON_CreateNumber(1)); // 'id' is a number
+        cJSON_AddItemToObject(root, "id", cJSON_CreateNumber(1.0)); // 'id' is a number
         cJSON_AddItemToObject(root, "title", cJSON_CreateString("Silah Kulesi 1")); // 'title' is a string
 
         /* Convert the cJSON object to a printable string */
@@ -525,14 +545,15 @@ void JSON_Make(void) {
             gu8DataBuffer[sizeof(gu8DataBuffer) - 1] = '\0'; // Null-terminate in case of truncation
 
             // For debug: Print the generated JSON to the LCD
-            snprintf ((char *)"Generated JSON: %s\n", gu8DataBuffer);
-
+            HAL_UART_Transmit(&huart3, (uint8_t*)"Generated JSON: ", strlen("Generated JSON: "), 10);
+            HAL_UART_Transmit(&huart3, (uint8_t*)gu8DataBuffer, (uint16_t)strlen((char*)gu8DataBuffer), 10);
+            HAL_UART_Transmit(&huart3, (uint8_t*)"\n", strlen("\n"), 10);
             free(pOut_local); // Free the string allocated by cJSON_Print
         } else {
-            snprintf((char *)"JSON Make Error: Failed to print cJSON object\n");
+            HAL_UART_Transmit(&huart3, (uint8_t*)"JSON Make Error: Failed to print cJSON object\n", strlen("JSON Make Error: Failed to print cJSON object\n"), 10);
         }
         cJSON_Delete(root); // Free the cJSON object
     } else {
-        snprintf((char *)"JSON Make Error: Failed to create cJSON root object\n");
+        HAL_UART_Transmit(&huart3, (uint8_t*)"JSON Make Error: Failed to create cJSON root object\n", strlen("JSON Make Error: Failed to create cJSON root object\n"), 10);
     }
 }
