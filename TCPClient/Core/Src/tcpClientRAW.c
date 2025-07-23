@@ -56,7 +56,7 @@
  /* This file was modified by ST */
 
 #include "tcpClientRAW.h"
-
+//#include "jsmn.h"
 #include "lwip/tcp.h"
 
 
@@ -159,7 +159,8 @@ void tcp_client_init(void)
 	/* 2. Connect to the server */
 	ip_addr_t destIPADDR;
 	IP_ADDR4(&destIPADDR, 172, 20, 3, 41);
-	tcp_connect(tpcb, &destIPADDR, 31, tcp_client_connected);
+	//IP_ADDR4(&destIPADDR, 169, 254, 1, 1);
+	tcp_connect(tpcb, &destIPADDR, 1234, tcp_client_connected);
 }
 
 /** This callback is called, when the client is connected to the server
