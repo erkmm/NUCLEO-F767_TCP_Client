@@ -472,9 +472,8 @@ static void tcp_client_handle (struct tcp_pcb *tpcb, struct tcp_client_struct *e
 
 	counter++;
 	JSON_Parse();
-
 	JSON_Make();
-
+	//Json analyze
 	// Use the generated JSON string from gu8DataBuffer instead of undefined pOut
 	int len = sprintf (buf, "%s", (char*)gu8DataBuffer);
 
